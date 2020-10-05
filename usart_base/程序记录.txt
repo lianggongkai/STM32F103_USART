@@ -1,0 +1,20 @@
+2016/11/13:
+	stm32f103vet6实现功能-【systick虚拟出256个定时器】
+	实现思路：
+	1，使用systick产生1ms中断，将全局变量timeMs自增1
+	2，使用函数GetCurSysTick()获取当前timeMs;
+	3, 定义定时器数据结构类型，TimerType;
+	4, 定义定时器维护数据结构类型，TimerCounter;
+	5，编写定时器数据结构操作函数，SetTimer();ClearTimer();CheckTimer();
+	6, 编写定时器维护函数CheckAllTimer();可以在中断函数实现参数更新
+	
+	定时器使用方法：
+	/*
+	* 用户自定义的定时器使用方法
+	* 1，用TimerType定义定时器变量
+	* 2，调用SetTimer()函数设定定时时长
+	* 3, 在SysTickHandler中断函数中调用CheckAllTimer();
+	* 4, 调用EnableTimer()，启动定时器。
+	* 5, 在函数中查询定时器结构变量的Res，1表示定时到达
+	* 6，如果想循环使用定时器可以调用ClearTimer()，清除上次结果
+	*/
