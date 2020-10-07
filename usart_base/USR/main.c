@@ -55,8 +55,10 @@ u16 Rx[1025] =  { 1000,2000};
 float ff = 1.0f;
 int main()
 {
-    int x = 0;
+    int x = 0, cnt;
     char buffer[1000] = {0};
+    uint32_t rcv_cnt;
+    
     SysTick_Init();
     InitKey(&K1,GPIOC, GPIO_Pin_5);
     InitOut(&RedLed,GPIOA,GPIO_Pin_8);
@@ -66,8 +68,8 @@ int main()
     //eMBInit(MB_RTU,0X02,0X00,19200,MB_PAR_NONE);
     //eMBEnable(0, 19200, 8, MB_PAR_NONE);
     usart1_init(0, 38400, 8, 0);
-//  Set(&RedLed);
-//  Set(&GreenLed);
+    //Set(&RedLed);
+    //Set(&GreenLed);
     if(!SetTimer(&T1,200)){
         return -1;
     }
@@ -76,6 +78,7 @@ int main()
     }
 
     EnableTimer(&T1);
+    EnableTimer(&T2);
     //USART1_NVIC_Init();
     while(1)
     {
@@ -87,9 +90,21 @@ int main()
             Tx[5]++;
             //sprintf(buffer, "%d * %d = %d\n", x, x, x * x);
             //sprintf(buffer, "hello-%d\n", x);
-            sprintf(buffer, "hello cola-==%d\n", x % 10);
+            cnt = sprintf(buffer, "snd: hello cola-==%d\n", x % 10);
             x += 1;
-            usart_write_bytes((uint8_t *)buffer);
+            //usart_write_bytes((uint8_t *)buffer, cnt);
+        }
+        
+        if (T2.Res) {
+            ResetTimer(&T2);
+            EnableTimer(&T2);
+            rcv_cnt = usart_get_rfifo_bytes();
+            if (rcv_cnt) {
+            //cnt = sprintf(buffer, "rcv: ");
+                cnt =0;
+            usart_read_bytes((uint8_t *)buffer + cnt, rcv_cnt);
+            usart_write_bytes((uint8_t *)buffer, rcv_cnt + cnt);
+            }
         }
     }
 }

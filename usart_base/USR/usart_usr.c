@@ -6,8 +6,6 @@
 #include "g_errno.h"
 #include "fifo.h"
 
-#define _USART1_IRQ 1
-
 rfifo_t tx_fifo, rx_fifo;
 
 /*initialize usart1 */
@@ -29,12 +27,12 @@ void usart1_init(uint8_t ucPort, uint32_t ulBaudRate, uint8_t ucDataBits,
     GPIO_InitStruct.GPIO_Pin = USART1_TX;
     GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF_PP;
     GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA,&GPIO_InitStruct);
+    GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     /* config usart rx gpio */
     GPIO_InitStruct.GPIO_Pin = USART1_RX;
     GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    GPIO_Init(GPIOA,&GPIO_InitStruct);
+    GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     /* config baudrate, mode, parity, word, stop bit */
     USART_InitStruct.USART_BaudRate = ulBaudRate;
@@ -43,18 +41,18 @@ void usart1_init(uint8_t ucPort, uint32_t ulBaudRate, uint8_t ucDataBits,
     USART_InitStruct.USART_Parity = eParity ;
     USART_InitStruct.USART_StopBits = USART_StopBits_1;
     USART_InitStruct.USART_WordLength = USART_WordLength_8b ;
-    USART_Init(USART1,&USART_InitStruct);
+    USART_Init(USART1, &USART_InitStruct);
 
-    /* 配置USART1的时钟并初始化 */
+    /* usart1 clock init */
     USART_ClockStructInit(&USART_ClockInitStruct);
-    USART_ClockInit(USART1,&USART_ClockInitStruct);
+    USART_ClockInit(USART1, &USART_ClockInitStruct);
 
-    /* 打开USART1 */
-    USART_ITConfig(USART1,USART_IT_RXNE,ENABLE);
-    USART_Cmd(USART1,ENABLE);
-    USART_ClearFlag(USART1,USART_FLAG_TC);
+    /* enable usart1 */
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
+    USART_Cmd(USART1, ENABLE);
+    USART_ClearFlag(USART1, USART_FLAG_TC);
 
-    //NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+    /* enable usart interrupt */
     NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
@@ -65,58 +63,39 @@ void usart1_init(uint8_t ucPort, uint32_t ulBaudRate, uint8_t ucDataBits,
     rfifo_init(&tx_fifo);
 }
 
-#ifdef _USART1_IRQ //如果定义了串口1中断
-void USART1_NVIC_Init(void)
-{
-    NVIC_InitTypeDef NVIC_InitStruct;
-    //选择串口中断通道
-    NVIC_InitStruct.NVIC_IRQChannel = USART1_IRQn;
-    //设置优先级，最低优先级
-    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x0f;
-    //设置次级优先级，最低优先级
-    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x0f;
-    //开启中断通道
-    NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
-    //更新中断控制器
-    NVIC_Init(&NVIC_InitStruct);
-    //关闭USART1的发送中断
-    USART_ITConfig(USART1,USART_IT_TXE,DISABLE);
-    //开启USART1的接收中断
-    USART_ITConfig(USART1,USART_IT_RXNE,ENABLE);
-
-}
-
 /*
  * note: in fifo_push function will not suitable because it has fifo pop here
  *       and in interrupt routine. So the fifo pop may compete key data in
  *       read index.
  * TODO : find a method avoid compete data.
+ * avoid compete : by using start flag of fifo, in main function when operate
+ *      fifo we have disabled interrupt, eg: in usart_write_byte() function, so
+ *      there is no compete
  */
-uint32_t usart_write_bytes(uint8_t *data)
+uint32_t usart_write_bytes(uint8_t *data, uint16_t num)
 {
-    uint32_t ret = ERR_OK;
+    uint32_t cnt = 0, ret;
 
-    if (!data) {
-        return ret;
+    if (!data || !num) {
+        return cnt;
     }
 
-    for (; *data != '\0'; data++) {
+    for (cnt = 0; cnt < num; cnt++) {
         do {
-            ret = usart_write_byte(*data);
+            ret = usart_write_byte(data[cnt]);
         } while(ret != ERR_OK);
     }
 
-    return ret;
+    return num;
 }
 
 uint32_t usart_write_byte(uint8_t data)
 {
     if (rfifo_push(&tx_fifo, data) == ERR_OK) {
         if (tx_fifo.start) {
-            //tx_fifo.start = 0;
             rfifo_pop(&tx_fifo, &data);
             USART_SendData(USART1, data);
-            USART_ITConfig(USART1,USART_IT_TXE, ENABLE);
+            USART_ITConfig(USART1, USART_IT_TXE, ENABLE);
         }
     } else {
         return ERR_FAIL;
@@ -124,27 +103,32 @@ uint32_t usart_write_byte(uint8_t data)
     return ERR_OK;
 }
 
-uint8_t usart_read_bytes(uint8_t *data)
+uint32_t usart_get_rfifo_bytes(void)
 {
-    uint8_t idx = 0, tmp;
+    return rfifo_len(&rx_fifo);
+}
 
-    if (!data || (rfifo_len(&rx_fifo) == 0)) {
+uint32_t usart_read_bytes(uint8_t *data, uint16_t num)
+{
+    uint16_t cnt = 0;
+    uint8_t tmp;
+
+    if (!data || !num || (rfifo_len(&rx_fifo) == 0)) {
         return 0;
     }
 
-    do {
+    for (; cnt < MIN(rfifo_len(&rx_fifo), num); cnt++) {
         if (rfifo_pop(&rx_fifo, &tmp) == ERR_OK) {
-            data[idx++] = tmp;
+            data[cnt] = tmp;
         } else {
             break;
         }
-    } while(rfifo_len(&rx_fifo));
-    USART_ITConfig(USART1,USART_IT_TXE,ENABLE);
+    }
 
-    return idx;
+    return cnt;
 }
 
-uint8_t usart_read_byte(uint8_t *data)
+uint32_t usart_read_byte(uint8_t *data)
 {
     if (!data || (rfifo_len(&rx_fifo) == 0)) {
         return ERR_FAIL;
@@ -155,31 +139,26 @@ uint8_t usart_read_byte(uint8_t *data)
     return ERR_OK;
 }
 
-#endif
-
 void USART1_IRQHandler(void)
 {
-    u8 ch;
-    //接收中断，向接收缓冲区Put数据
-    if(USART_GetITStatus(USART1,USART_IT_RXNE) != RESET)
+    uint8_t ch;
+    /* receive data, push into rx fifo */
+    if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
     {
         ch = (u8)USART_ReceiveData(USART1);
         rfifo_push(&rx_fifo, ch);
     }
-    //发送中断，从发送缓冲区Get数据
-    if(USART_GetITStatus(USART1,USART_IT_TXE) != RESET)
+
+    /* send data, pop from tx fifo */
+    if(USART_GetITStatus(USART1, USART_IT_TXE) != RESET)
     {
-        if(rfifo_pop(&tx_fifo,&ch) == ERR_OK)//是否成功Get到数据
-        {
-            USART_SendData(USART1,ch);
-            //tx_fifo.start = 0;
-        }
-        else{//如果没有Get到数据，说明发送缓冲区空了。关闭发送中断
-            USART_ITConfig(USART1,USART_IT_TXE,DISABLE);
-            //tx_fifo.start = 1;
+        /* pop data success, send poped data, or disable interrupt */
+        if(rfifo_pop(&tx_fifo, &ch) == ERR_OK) {
+            USART_SendData(USART1, ch);
+        } else {
+            USART_ITConfig(USART1, USART_IT_TXE, DISABLE);
         }
     }
-    ch = 1;
 }
 
 

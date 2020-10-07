@@ -149,23 +149,7 @@
         <Bp>
           <Number>0</Number>
           <Type>0</Type>
-          <LineNumber>92</LineNumber>
-          <EnabledFlag>0</EnabledFlag>
-          <Address>134225668</Address>
-          <ByteObject>0</ByteObject>
-          <HtxType>0</HtxType>
-          <ManyObjects>0</ManyObjects>
-          <SizeOfObject>0</SizeOfObject>
-          <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>1</BreakIfRCount>
-          <Filename>.\USR\main.c</Filename>
-          <ExecCommand></ExecCommand>
-          <Expression>\\uart\USR/main.c\92</Expression>
-        </Bp>
-        <Bp>
-          <Number>1</Number>
-          <Type>0</Type>
-          <LineNumber>68</LineNumber>
+          <LineNumber>70</LineNumber>
           <EnabledFlag>0</EnabledFlag>
           <Address>134225556</Address>
           <ByteObject>0</ByteObject>
@@ -176,12 +160,12 @@
           <BreakIfRCount>1</BreakIfRCount>
           <Filename>.\USR\main.c</Filename>
           <ExecCommand></ExecCommand>
-          <Expression>\\uart\USR/main.c\68</Expression>
+          <Expression>\\uart\USR/main.c\70</Expression>
         </Bp>
         <Bp>
-          <Number>2</Number>
+          <Number>1</Number>
           <Type>0</Type>
-          <LineNumber>77</LineNumber>
+          <LineNumber>95</LineNumber>
           <EnabledFlag>0</EnabledFlag>
           <Address>0</Address>
           <ByteObject>0</ByteObject>
@@ -270,6 +254,16 @@
           <count>14</count>
           <WinNumber>1</WinNumber>
           <ItemText>tx_fifo</ItemText>
+        </Ww>
+        <Ww>
+          <count>15</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>rx_fifo</ItemText>
+        </Ww>
+        <Ww>
+          <count>16</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>buffer</ItemText>
         </Ww>
       </WatchWindow1>
       <MemoryWindow1>
